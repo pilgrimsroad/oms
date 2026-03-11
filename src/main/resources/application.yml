@@ -1,0 +1,61 @@
+server:
+  port: 8080
+  servlet:
+    context-path: /
+
+springdoc:
+  swagger-ui:
+    path: /swagger-ui.html
+    operationsSorter: method
+  api-docs:
+    path: /v3/api-docs
+
+spring:
+  application:
+    name: oms-api
+  datasource:
+    driver-class-name: org.h2.Driver
+    url: jdbc:h2:mem:oms;MODE=MYSQL;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE
+    username: sa
+    password:
+  sql:
+    init:
+      mode: always
+      schema-locations: classpath:sql/ddl/schema-h2.sql
+      data-locations: classpath:sql/ddl/data-h2.sql
+  jpa:
+    hibernate:
+      ddl-auto: none
+    open-in-view: false
+  h2:
+    console:
+      enabled: true
+      path: /h2-console
+
+logging:
+  level:
+    com.p6spy: DEBUG
+    com.dbass.oms.api: DEBUG
+    org.springframework.security: DEBUG
+
+app:
+  jwt:
+    secret: ${OMS_JWT_SECRET:local-dev-secret-change-me-32-bytes-min}
+    expiration-minutes: ${OMS_JWT_EXPIRES_MINUTES:525600}
+
+access-control:
+  service-types:
+    "1":
+      name: "API"
+      allowed-paths:
+        - "/api/**"
+    "2":
+      name: "Web"
+      allowed-paths:
+        - "/api/auth/**"
+        - "/api/health"
+
+decorator:
+  datasource:
+    p6spy:
+      enable-logging: true

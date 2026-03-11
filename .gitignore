@@ -1,0 +1,55 @@
+# Java/Gradle
+*.class
+*.jar
+*.war
+*.ear
+*.iml
+.gradle/
+build/
+out/
+bin/
+
+# IDE
+.idea/
+*.iws
+*.ipr
+*.iml
+.vscode/
+.classpath
+.factorypath
+.project
+.settings/
+.springBeans
+.sts4-cache
+.apt_generated
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+
+# Env
+.env
+.env.*
+
+# Docs (local only)
+README.md
+
+# H2
+*.h2.db
+*.mv.db
+*.trace.db
+
+# Gradle wrapper
+
+# NetBeans
+/nbproject/private/
+/nbbuild/
+/dist/
+/nbdist/
+/.nb-gradle/
+
+# VS Code
+.vscode/
