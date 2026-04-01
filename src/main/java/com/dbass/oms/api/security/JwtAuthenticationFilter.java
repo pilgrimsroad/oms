@@ -32,6 +32,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
     private static final List<String> EXCLUDE_PATHS = Arrays.asList(
             "/api/auth/register",
             "/api/auth/token",
+            "/api/auth/login",
             "/api/health",
             "/v3/api-docs",
             "/swagger-ui",
@@ -84,7 +85,8 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         if ("2".equals(serviceType)) {
             List<String> allowedPathsForWeb = Arrays.asList(
                     "/api/auth",
-                    "/api/health"
+                    "/api/health",
+                    "/api/messages"
             );
             return allowedPathsForWeb.stream().anyMatch(requestURI::startsWith);
         }

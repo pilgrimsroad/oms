@@ -36,6 +36,7 @@ Thumbs.db
 
 # Docs (local only)
 README.md
+DOCKER.md
 
 # H2
 *.h2.db

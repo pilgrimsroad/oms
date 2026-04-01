@@ -64,6 +64,28 @@ public class OmsUserServiceImpl implements OmsUserService {
 
     @Override
     @Transactional
+    public OmsUser loginWeb(String userId, String userPassword) {
+        OmsUser omsUser = omsUserRepository.findByUserIdAndUserType(userId, "2")
+                .orElseThrow(() -> new RuntimeException("사용자를 찾을 수 없습니다."));
+
+        if (!"Y".equals(omsUser.getUseYn())) {
+            throw new RuntimeException("비활성화된 사용자입니다.");
+        }
+
+        if (!passwordEncoder.matches(userPassword, omsUser.getUserPassword())) {
+            if (userPassword != null && userPassword.equals(omsUser.getUserPassword())) {
+                omsUser.setUserPassword(passwordEncoder.encode(userPassword));
+                omsUserRepository.save(omsUser);
+            } else {
+                throw new RuntimeException("사용자 비밀번호가 올바르지 않습니다.");
+            }
+        }
+
+        return omsUser;
+    }
+
+    @Override
+    @Transactional
     public void deactivateUser(String userId, String userUrl) {
         OmsUser omsUser = omsUserRepository.findByUserIdAndUserUrl(userId, userUrl)
                 .orElseThrow(() -> new RuntimeException("사용자를 찾을 수 없습니다."));

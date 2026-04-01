@@ -9,6 +9,29 @@ VALUES (
   CURRENT_TIMESTAMP()
 );
 
+-- 웹 조회 페이지 테스트 계정 (user_type=2)
+INSERT INTO OMS_USER (user_id, user_url, user_type, user_password, use_yn, insert_id, insert_dts)
+VALUES (
+  'WEB_USER_01',
+  'https://web.oms.local',
+  '2',
+  'password1',
+  'Y',
+  'portfolio',
+  CURRENT_TIMESTAMP()
+);
+
+INSERT INTO OMS_USER (user_id, user_url, user_type, user_password, use_yn, insert_id, insert_dts)
+VALUES (
+  'WEB_USER_02',
+  'https://web.oms.local',
+  '2',
+  'password2',
+  'Y',
+  'portfolio',
+  CURRENT_TIMESTAMP()
+);
+
 INSERT INTO TEST_SUBMIT_LOG (subject, message, msg_type, status, schedule_time, submit_time, callback_num, rcpt_data, result, result_desc)
 VALUES
 ('SMS 배송 안내', '배송이 시작되었습니다. 운송장 확인 부탁드립니다.', 1, 2, '20250105103000', '20250105103010', '01000000000', '01000000000', 'SUCCESS', 'Delivered'),

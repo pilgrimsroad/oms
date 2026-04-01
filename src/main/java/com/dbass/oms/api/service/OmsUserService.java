@@ -35,4 +35,14 @@ public interface OmsUserService {
      * @throws RuntimeException 사용자가 존재하지 않는 경우
      */
     void deactivateUser(String userId, String userUrl);
+
+    /**
+     * 웹 사용자 로그인 (userId + password만으로 인증)
+     *
+     * @param userId 사용자 ID
+     * @param userPassword 사용자 비밀번호
+     * @return 로그인한 사용자 정보 (JWT 발급용)
+     * @throws RuntimeException 인증 실패 또는 비활성화된 경우
+     */
+    OmsUser loginWeb(String userId, String userPassword);
 }

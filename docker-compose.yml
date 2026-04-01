@@ -1,0 +1,16 @@
+services:
+
+  oms-api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: oms-api
+    ports:
+      - "8080:8080"
+    env_file:
+      - .env
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:8080/api/health || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5

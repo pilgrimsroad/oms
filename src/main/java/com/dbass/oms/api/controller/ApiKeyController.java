@@ -2,13 +2,16 @@ package com.dbass.oms.api.controller;
 
 import com.dbass.oms.api.dto.*;
 import com.dbass.oms.api.security.JwtTokenProvider;
+import com.dbass.oms.api.security.UserPrincipal;
 import com.dbass.oms.api.service.OmsUserService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import jakarta.validation.Valid;
 import jakarta.servlet.http.HttpServletRequest;
 
@@ -92,5 +95,56 @@ public class ApiKeyController {
                     .build();
             return ResponseEntity.badRequest().body(error);
         }
+    }
+
+    @PostMapping("/login")
+    @Operation(
+        summary = "웹 로그인",
+        description = "웹 사용자(user_type=2) 전용 로그인. userId와 password만으로 JWT를 발급합니다.",
+        responses = {
+            @ApiResponse(responseCode = "200", description = "로그인 성공"),
+            @ApiResponse(responseCode = "400", description = "인증 실패")
+        }
+    )
+    public ResponseEntity<?> loginWeb(
+            @Valid @RequestBody WebLoginRequestDto request,
+            HttpServletRequest httpRequest) {
+        try {
+            OmsUser omsUser = omsUserService.loginWeb(request.getUserId(), request.getUserPassword());
+            String token = jwtTokenProvider.generateToken(omsUser);
+
+            WebLoginResponseDto response = WebLoginResponseDto.builder()
+                    .accessToken(token)
+                    .tokenType("Bearer")
+                    .expiresInMinutes(jwtTokenProvider.getExpirationMinutes())
+                    .userId(omsUser.getUserId())
+                    .userType(omsUser.getUserType())
+                    .build();
+
+            return ResponseEntity.ok(response);
+        } catch (RuntimeException e) {
+            ApiErrorResponseDto error = ApiErrorResponseDto.builder()
+                    .error(e.getMessage())
+                    .path(httpRequest.getRequestURI())
+                    .build();
+            return ResponseEntity.badRequest().body(error);
+        }
+    }
+
+    @PostMapping("/logout")
+    @Operation(
+        summary = "로그아웃",
+        description = "JWT는 stateless이므로 서버에서 토큰을 무효화하지 않습니다. 클라이언트에서 토큰을 삭제하세요.",
+        security = @SecurityRequirement(name = "bearerAuth"),
+        responses = {
+            @ApiResponse(responseCode = "200", description = "로그아웃 성공"),
+            @ApiResponse(responseCode = "401", description = "인증 필요")
+        }
+    )
+    public ResponseEntity<?> logout(@AuthenticationPrincipal UserPrincipal principal) {
+        return ResponseEntity.ok().body(java.util.Map.of(
+                "message", "로그아웃 되었습니다.",
+                "userId", principal.getUserId()
+        ));
     }
 } 
