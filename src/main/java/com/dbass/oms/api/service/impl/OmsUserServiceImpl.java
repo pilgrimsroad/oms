@@ -10,7 +10,6 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
-import java.time.format.DateTimeFormatter;
 
 @Service
 @RequiredArgsConstructor
@@ -33,7 +32,7 @@ public class OmsUserServiceImpl implements OmsUserService {
         omsUser.setUserType(userType);
         omsUser.setUserPassword(passwordEncoder.encode(userPassword));
         omsUser.setUseYn("Y");
-        omsUser.setInsertDts(LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")));
+        omsUser.setInsertDts(LocalDateTime.now());
         omsUser.setInsertId(insertId);
 
         return omsUserRepository.save(omsUser);

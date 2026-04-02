@@ -1,5 +1,16 @@
 services:
 
+  redis:
+    image: redis:7-alpine
+    container_name: oms-redis
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
   oms-api:
     build:
       context: .
@@ -9,6 +20,13 @@ services:
       - "8080:8080"
     env_file:
       - .env
+    environment:
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - DB_HOST=host.docker.internal
+    depends_on:
+      redis:
+        condition: service_healthy
     healthcheck:
       test: ["CMD-SHELL", "wget -qO- http://localhost:8080/api/health || exit 1"]
       interval: 10s
@@ -24,4 +42,13 @@ services:
       - "80:80"
     depends_on:
       oms-api:
+        condition: service_healthy
+
+  redis-insight:
+    image: redis/redisinsight:latest
+    container_name: oms-redis-insight
+    ports:
+      - "8001:5540"
+    depends_on:
+      redis:
         condition: service_healthy

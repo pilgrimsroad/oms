@@ -1,11 +1,13 @@
 package com.dbass.oms.api.service.impl;
 
+import com.dbass.oms.api.config.CacheConfig;
 import com.dbass.oms.api.dto.MessageResponseDto;
 import com.dbass.oms.api.dto.MessageSearchRequestDto;
 import com.dbass.oms.api.entity.MessageLog;
 import com.dbass.oms.api.repository.MessageRepository;
 import com.dbass.oms.api.service.MessageService;
 import lombok.RequiredArgsConstructor;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
@@ -19,6 +21,7 @@ public class MessageServiceImpl implements MessageService {
     private final MessageRepository messageRepository;
 
     @Override
+    @Cacheable(value = CacheConfig.MESSAGES_CACHE, key = "#requestDto.startDate + ':' + #requestDto.endDate + ':' + #requestDto.msgType + ':' + #requestDto.status + ':' + #requestDto.recipient")
     public List<MessageResponseDto> searchMessages(MessageSearchRequestDto requestDto) {
         String start = requestDto.getStartDate() + "000000";
         String end = requestDto.getEndDate() + "235959";

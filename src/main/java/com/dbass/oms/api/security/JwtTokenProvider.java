@@ -46,7 +46,7 @@ public class JwtTokenProvider {
         return Jwts.builder()
                 .subject(service.getUserId())
                 .claim("userUrl", service.getUserUrl())
-                .claim("userType", service.getUserType())
+                .claim("userType", service.getUserType() != null ? service.getUserType().trim() : null)
                 .issuedAt(issuedAt)
                 .expiration(expiration)
                 .signWith(signingKey)

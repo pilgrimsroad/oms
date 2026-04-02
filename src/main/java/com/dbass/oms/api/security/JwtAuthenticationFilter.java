@@ -1,5 +1,6 @@
 package com.dbass.oms.api.security;
 
+import com.dbass.oms.api.service.TokenBlacklistService;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.jsonwebtoken.Claims;
 import jakarta.servlet.FilterChain;
@@ -27,6 +28,7 @@ import java.util.Map;
 public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
     private final JwtTokenProvider jwtTokenProvider;
+    private final TokenBlacklistService tokenBlacklistService;
     private final ObjectMapper objectMapper = new ObjectMapper();
 
     private static final List<String> EXCLUDE_PATHS = Arrays.asList(
@@ -60,10 +62,17 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             return;
         }
 
+        if (tokenBlacklistService.isBlacklisted(token)) {
+            sendJsonErrorResponse(response, HttpServletResponse.SC_UNAUTHORIZED,
+                    "로그아웃된 토큰입니다. 다시 로그인해 주세요.", request.getRequestURI());
+            return;
+        }
+
         Claims claims = jwtTokenProvider.parseClaims(token);
         String serviceId = claims.getSubject();
         String serviceUrl = claims.get("userUrl", String.class);
         String serviceType = claims.get("userType", String.class);
+        if (serviceType != null) serviceType = serviceType.trim();
 
         if (!isAccessAllowed(serviceType, request.getRequestURI())) {
             sendJsonErrorResponse(response, HttpServletResponse.SC_FORBIDDEN,

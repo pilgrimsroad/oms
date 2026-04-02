@@ -4,6 +4,8 @@ import com.dbass.oms.api.dto.*;
 import com.dbass.oms.api.security.JwtTokenProvider;
 import com.dbass.oms.api.security.UserPrincipal;
 import com.dbass.oms.api.service.OmsUserService;
+import com.dbass.oms.api.service.TokenBlacklistService;
+import io.jsonwebtoken.Claims;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -15,6 +17,10 @@ import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import jakarta.validation.Valid;
 import jakarta.servlet.http.HttpServletRequest;
 
+import java.time.Duration;
+import java.time.Instant;
+import java.util.Date;
+
 @RestController
 @RequestMapping("/api/auth")
 @Tag(name = "JWT Auth", description = "사용자 등록 및 JWT 발급")
@@ -23,6 +29,7 @@ public class ApiKeyController {
 
     private final OmsUserService omsUserService;
     private final JwtTokenProvider jwtTokenProvider;
+    private final TokenBlacklistService tokenBlacklistService;
 
     @PostMapping("/register")
     @Operation(
@@ -141,7 +148,19 @@ public class ApiKeyController {
             @ApiResponse(responseCode = "401", description = "인증 필요")
         }
     )
-    public ResponseEntity<?> logout(@AuthenticationPrincipal UserPrincipal principal) {
+    public ResponseEntity<?> logout(
+            @AuthenticationPrincipal UserPrincipal principal,
+            HttpServletRequest httpRequest) {
+        String authHeader = httpRequest.getHeader("Authorization");
+        if (authHeader != null && authHeader.startsWith("Bearer ")) {
+            String token = authHeader.substring(7);
+            Claims claims = jwtTokenProvider.parseClaims(token);
+            Date expiration = claims.getExpiration();
+            long remainingSeconds = expiration.toInstant().getEpochSecond() - Instant.now().getEpochSecond();
+            if (remainingSeconds > 0) {
+                tokenBlacklistService.blacklist(token, Duration.ofSeconds(remainingSeconds));
+            }
+        }
         return ResponseEntity.ok().body(java.util.Map.of(
                 "message", "로그아웃 되었습니다.",
                 "userId", principal.getUserId()

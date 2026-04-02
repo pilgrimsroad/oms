@@ -13,30 +13,61 @@ springdoc:
 spring:
   application:
     name: oms-api
+
+  # ========================
+  # [활성] PostgreSQL 설정
+  # ========================
   datasource:
-    driver-class-name: org.h2.Driver
-    url: jdbc:h2:mem:oms;MODE=MYSQL;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE
-    username: sa
-    password:
-  sql:
-    init:
-      mode: always
-      schema-locations: classpath:sql/ddl/schema-h2.sql
-      data-locations: classpath:sql/ddl/data-h2.sql
+    driver-class-name: org.postgresql.Driver
+    url: jdbc:postgresql://${DB_HOST:localhost}:${DB_PORT:5432}/oms_test
+    username: test01
+    password: "12345678"
+#  sql:
+#    init:
+#      mode: always
+#      schema-locations: classpath:sql/ddl/schema-postgresql.sql
+#      data-locations: classpath:sql/ddl/data-postgresql.sql
   jpa:
     hibernate:
       ddl-auto: none
     open-in-view: false
-  h2:
-    console:
-      enabled: true
-      path: /h2-console
+    database-platform: org.hibernate.dialect.PostgreSQLDialect
+
+  # ========================
+  # [비활성] H2 설정
+  # H2로 전환 시: 위 PostgreSQL 블록 전체 주석, 아래 주석 해제
+  # ========================
+#  datasource:
+#    driver-class-name: org.h2.Driver
+#    url: jdbc:h2:mem:oms;MODE=MYSQL;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE
+#    username: sa
+#    password:
+#  sql:
+#    init:
+#      mode: always
+#      schema-locations: classpath:sql/ddl/schema-h2.sql
+#      data-locations: classpath:sql/ddl/data-h2.sql
+#  jpa:
+#    hibernate:
+#      ddl-auto: none
+#    open-in-view: false
+#  h2:
+#    console:
+#      enabled: true
+#      path: /h2-console
+
+  data:
+    redis:
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:6379}
 
 logging:
   level:
     com.p6spy: DEBUG
     com.dbass.oms.api: DEBUG
     org.springframework.security: DEBUG
+    org.hibernate.SQL: DEBUG
+    org.hibernate.orm.jdbc.bind: TRACE
 
 app:
   jwt:

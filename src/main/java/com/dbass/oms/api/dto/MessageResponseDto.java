@@ -3,11 +3,13 @@ package com.dbass.oms.api.dto;
 import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.AllArgsConstructor;
 import lombok.Data;
+import lombok.NoArgsConstructor;
 
 /**
  * 문자 발송 이력 응답 DTO
  */
 @Data
+@NoArgsConstructor
 @AllArgsConstructor
 public class MessageResponseDto {
 

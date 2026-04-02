@@ -10,6 +10,8 @@ import jakarta.persistence.Id;
 import jakarta.persistence.Table;
 import lombok.Data;
 
+import java.time.LocalDateTime;
+
 /**
  * OMS 사용자 DTO
  */
@@ -47,7 +49,7 @@ public class OmsUser {
 
     @Column(name = "insert_dts")
     @Schema(description = "등록일")
-    private String insertDts;
+    private LocalDateTime insertDts;
 
     @Column(name = "insert_id")
     @Schema(description = "등록자 ID")
@@ -55,7 +57,7 @@ public class OmsUser {
 
     @Column(name = "update_dts")
     @Schema(description = "수정일")
-    private String updateDts;
+    private LocalDateTime updateDts;
 
     @Column(name = "update_id")
     @Schema(description = "수정자 ID")

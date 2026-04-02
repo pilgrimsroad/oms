@@ -298,3 +298,31 @@ AuthControllerTest
     ├── 성공 - 유효한 토큰
     └── 실패 - 토큰 없음
 ```
+
+---
+
+## 업데이트 내역
+
+### 2026-04-02
+
+**Redis 도입 (캐싱 / JWT 블랙리스트)**
+- `spring-boot-starter-data-redis` 의존성 추가
+- JWT 블랙리스트: 로그아웃 시 토큰을 Redis에 저장(TTL = 남은 만료시간), 이후 동일 토큰 요청 차단
+- 메시지 조회 캐싱: 동일 검색 조건 반복 조회 시 Redis에서 응답 (TTL 5분)
+- `TokenBlacklistService`, `RedisConfig`, `CacheConfig` 클래스 신규 추가
+- Redis Insight 관제 도구를 Docker Compose에 포함 (포트 8001)
+
+**DB 전환 (H2 → PostgreSQL)**
+- `application.yml`에 PostgreSQL / H2 블록 분리 (주석 전환 방식으로 관리)
+- `schema-postgresql.sql`, `data-postgresql.sql` 신규 추가
+- `OmsUser.insertDts`, `updateDts` 타입 `String` → `LocalDateTime` 변경
+- JWT claim 내 `userType` 공백 패딩 처리 (`CHAR(2)` → trim)
+
+**프론트엔드 개선 (oms_front)**
+- 날짜 선택 컴포넌트를 커스텀 DatePicker → **Ant Design RangePicker**로 교체
+  - 시작일/종료일 하나의 컴포넌트로 통합
+  - 시작일 > 종료일 선택 자동 차단
+  - 수기 입력 시 `-` 자동 삽입 (mask 모드)
+  - 한국어 locale 적용
+- 조회 결과 **100건 단위 페이지네이션** 추가
+- 총 건수 3자리 콤마 포맷 적용
