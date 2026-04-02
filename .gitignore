@@ -35,8 +35,8 @@ Thumbs.db
 .env.*
 
 # Docs (local only)
-README.md
-DOCKER.md
+#README.md
+#DOCKER.md
 
 # H2
 *.h2.db
