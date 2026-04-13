@@ -3,6 +3,9 @@ services:
   redis:
     image: redis:7-alpine
     container_name: oms-redis
+    command: redis-server --appendonly yes
+    volumes:
+      - redis-data:/data
     ports:
       - "6379:6379"
     healthcheck:
@@ -52,3 +55,6 @@ services:
     depends_on:
       redis:
         condition: service_healthy
+
+volumes:
+  redis-data:

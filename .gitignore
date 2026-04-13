@@ -54,3 +54,6 @@ Thumbs.db
 
 # VS Code
 .vscode/
+
+# QueryDSL 관련
+src/main/generated/

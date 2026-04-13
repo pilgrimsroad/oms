@@ -1,24 +1,36 @@
 package com.dbass.oms.api.controller;
 
+import com.dbass.oms.api.config.TestConfig;
 import com.dbass.oms.api.dto.WebLoginRequestDto;
+import com.dbass.oms.api.service.TokenBlacklistService;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.test.mock.mockito.MockBean;
+import org.springframework.context.annotation.Import;
 import org.springframework.http.MediaType;
+import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
 
-import static org.hamcrest.Matchers.*;
+import static org.hamcrest.Matchers.containsString;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.lenient;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultHandlers.print;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
 @SpringBootTest
 @AutoConfigureMockMvc
-@DisplayName("웹 로그인/로그아웃 API 테스트")
+@ActiveProfiles("test")
+@Import(TestConfig.class)
+@DisplayName("인증 API 테스트")
 class AuthControllerTest {
 
     @Autowired
@@ -27,7 +39,24 @@ class AuthControllerTest {
     @Autowired
     private ObjectMapper objectMapper;
 
-    // 로그인 후 토큰을 추출하는 헬퍼 메서드
+    @MockBean
+    private TokenBlacklistService tokenBlacklistService;
+
+    @MockBean
+    private PasswordEncoder passwordEncoder;
+
+    @BeforeEach
+    void setUpPasswordEncoder() {
+        // H2에 평문 비밀번호가 저장되어 있으므로 plain-text 비교로 동작
+        lenient().when(passwordEncoder.matches(anyString(), anyString()))
+                .thenAnswer(inv -> inv.getArgument(0).equals(inv.getArgument(1)));
+        lenient().when(passwordEncoder.encode(anyString()))
+                .thenAnswer(inv -> inv.getArgument(0));
+    }
+
+    // ──────────────────────────────────────────
+    // 헬퍼
+    // ──────────────────────────────────────────
     private String loginAndGetToken(String userId, String password) throws Exception {
         WebLoginRequestDto request = new WebLoginRequestDto();
         request.setUserId(userId);
@@ -36,14 +65,179 @@ class AuthControllerTest {
         MvcResult result = mockMvc.perform(post("/api/auth/login")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(request)))
+                .andDo(print())
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.accessToken").isNotEmpty())
                 .andReturn();
 
-        String body = result.getResponse().getContentAsString();
-        return objectMapper.readTree(body).get("accessToken").asText();
+        return objectMapper.readTree(result.getResponse().getContentAsString())
+                .get("accessToken").asText();
     }
 
     // ──────────────────────────────────────────
-    // 로그인 테스트
+    // 회원 등록 (POST /api/auth/register)
+    // ──────────────────────────────────────────
+    @Nested
+    @DisplayName("POST /api/auth/register")
+    class Register {
+
+        @Test
+        @DisplayName("성공 - 신규 사용자 등록")
+        void success() throws Exception {
+            mockMvc.perform(post("/api/auth/register")
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content("""
+                                    {
+                                        "userId": "NEW_API_USER",
+                                        "userUrl": "https://new-service.com",
+                                        "userType": "1",
+                                        "userPassword": "newpassword",
+                                        "insertId": "admin"
+                                    }
+                                    """))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.userId").value("NEW_API_USER"))
+                    .andExpect(jsonPath("$.userUrl").value("https://new-service.com"))
+                    .andExpect(jsonPath("$.message").value("사용자가 성공적으로 등록되었습니다."));
+        }
+
+        @Test
+        @DisplayName("실패 - 동일한 userId + userUrl 중복 등록")
+        void fail_duplicate() throws Exception {
+            // 첫 번째 등록
+            mockMvc.perform(post("/api/auth/register")
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content("""
+                                    {
+                                        "userId": "DUP_USER",
+                                        "userUrl": "https://dup.com",
+                                        "userType": "1",
+                                        "userPassword": "password",
+                                        "insertId": "admin"
+                                    }
+                                    """))
+                    .andExpect(status().isOk());
+
+            // 중복 등록 시도
+            mockMvc.perform(post("/api/auth/register")
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content("""
+                                    {
+                                        "userId": "DUP_USER",
+                                        "userUrl": "https://dup.com",
+                                        "userType": "1",
+                                        "userPassword": "password",
+                                        "insertId": "admin"
+                                    }
+                                    """))
+                    .andExpect(status().isBadRequest())
+                    .andExpect(jsonPath("$.error").value(containsString("이미 등록된")));
+        }
+
+        @Test
+        @DisplayName("실패 - 필수 필드(userId) 누락")
+        void fail_missingUserId() throws Exception {
+            mockMvc.perform(post("/api/auth/register")
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content("""
+                                    {
+                                        "userUrl": "https://example.com",
+                                        "userPassword": "password",
+                                        "insertId": "admin"
+                                    }
+                                    """))
+                    .andExpect(status().isBadRequest());
+        }
+
+        @Test
+        @DisplayName("실패 - 필수 필드(insertId) 누락")
+        void fail_missingInsertId() throws Exception {
+            mockMvc.perform(post("/api/auth/register")
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content("""
+                                    {
+                                        "userId": "SOME_USER",
+                                        "userUrl": "https://example.com",
+                                        "userPassword": "password"
+                                    }
+                                    """))
+                    .andExpect(status().isBadRequest());
+        }
+    }
+
+    // ──────────────────────────────────────────
+    // JWT 토큰 발급 (POST /api/auth/token)
+    // ──────────────────────────────────────────
+    @Nested
+    @DisplayName("POST /api/auth/token")
+    class IssueToken {
+
+        @Test
+        @DisplayName("성공 - DEMO_USER(type=1) 토큰 발급")
+        void success() throws Exception {
+            mockMvc.perform(post("/api/auth/token")
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content("""
+                                    {
+                                        "userId": "DEMO_USER",
+                                        "userUrl": "https://example.com",
+                                        "userPassword": "password"
+                                    }
+                                    """))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.accessToken").isNotEmpty())
+                    .andExpect(jsonPath("$.tokenType").value("Bearer"));
+        }
+
+        @Test
+        @DisplayName("실패 - 잘못된 비밀번호")
+        void fail_wrongPassword() throws Exception {
+            mockMvc.perform(post("/api/auth/token")
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content("""
+                                    {
+                                        "userId": "DEMO_USER",
+                                        "userUrl": "https://example.com",
+                                        "userPassword": "wrongpassword"
+                                    }
+                                    """))
+                    .andExpect(status().isBadRequest())
+                    .andExpect(jsonPath("$.error").value(containsString("비밀번호")));
+        }
+
+        @Test
+        @DisplayName("실패 - 존재하지 않는 사용자")
+        void fail_userNotFound() throws Exception {
+            mockMvc.perform(post("/api/auth/token")
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content("""
+                                    {
+                                        "userId": "NO_USER",
+                                        "userUrl": "https://no-user.com",
+                                        "userPassword": "password"
+                                    }
+                                    """))
+                    .andExpect(status().isBadRequest())
+                    .andExpect(jsonPath("$.error").value(containsString("찾을 수 없습니다")));
+        }
+
+        @Test
+        @DisplayName("실패 - 필수 필드(userUrl) 누락")
+        void fail_missingUserUrl() throws Exception {
+            mockMvc.perform(post("/api/auth/token")
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content("""
+                                    {
+                                        "userId": "DEMO_USER",
+                                        "userPassword": "password"
+                                    }
+                                    """))
+                    .andExpect(status().isBadRequest());
+        }
+    }
+
+    // ──────────────────────────────────────────
+    // 웹 로그인 (POST /api/auth/login)
     // ──────────────────────────────────────────
     @Nested
     @DisplayName("POST /api/auth/login")
@@ -59,6 +253,7 @@ class AuthControllerTest {
             mockMvc.perform(post("/api/auth/login")
                             .contentType(MediaType.APPLICATION_JSON)
                             .content(objectMapper.writeValueAsString(request)))
+                    .andDo(print()) // 요청/응답 전체 콘솔 출력 — 확인 후 제거 가능
                     .andExpect(status().isOk())
                     .andExpect(jsonPath("$.accessToken").isNotEmpty())
                     .andExpect(jsonPath("$.tokenType").value("Bearer"))
@@ -137,69 +332,7 @@ class AuthControllerTest {
     }
 
     // ──────────────────────────────────────────
-    // 메시지 조회 테스트 (type=2 접근 권한)
-    // ──────────────────────────────────────────
-    @Nested
-    @DisplayName("POST /api/messages/search (웹 사용자 접근)")
-    class MessageSearch {
-
-        @Test
-        @DisplayName("성공 - 웹 사용자(type=2) 토큰으로 메시지 조회")
-        void success_withWebToken() throws Exception {
-            String token = loginAndGetToken("WEB_USER_01", "password1");
-
-            String body = """
-                    {
-                        "startDate": "20250101",
-                        "endDate": "20251231"
-                    }
-                    """;
-
-            mockMvc.perform(post("/api/messages/search")
-                            .header("Authorization", "Bearer " + token)
-                            .contentType(MediaType.APPLICATION_JSON)
-                            .content(body))
-                    .andExpect(status().isOk())
-                    .andExpect(jsonPath("$").isArray())
-                    .andExpect(jsonPath("$", hasSize(greaterThan(0))));
-        }
-
-        @Test
-        @DisplayName("실패 - 토큰 없이 메시지 조회")
-        void fail_noToken() throws Exception {
-            String body = """
-                    {
-                        "startDate": "20250101",
-                        "endDate": "20251231"
-                    }
-                    """;
-
-            mockMvc.perform(post("/api/messages/search")
-                            .contentType(MediaType.APPLICATION_JSON)
-                            .content(body))
-                    .andExpect(status().isUnauthorized());
-        }
-
-        @Test
-        @DisplayName("실패 - 유효하지 않은 토큰")
-        void fail_invalidToken() throws Exception {
-            String body = """
-                    {
-                        "startDate": "20250101",
-                        "endDate": "20251231"
-                    }
-                    """;
-
-            mockMvc.perform(post("/api/messages/search")
-                            .header("Authorization", "Bearer invalid.token.value")
-                            .contentType(MediaType.APPLICATION_JSON)
-                            .content(body))
-                    .andExpect(status().isUnauthorized());
-        }
-    }
-
-    // ──────────────────────────────────────────
-    // 로그아웃 테스트
+    // 로그아웃 (POST /api/auth/logout)
     // ──────────────────────────────────────────
     @Nested
     @DisplayName("POST /api/auth/logout")
@@ -218,7 +351,7 @@ class AuthControllerTest {
         }
 
         @Test
-        @DisplayName("실패 - 토큰 없이 로그아웃 시도")
+        @DisplayName("실패 - 토큰 없이 로그아웃 시도 → 401")
         void fail_noToken() throws Exception {
             mockMvc.perform(post("/api/auth/logout"))
                     .andExpect(status().isUnauthorized());

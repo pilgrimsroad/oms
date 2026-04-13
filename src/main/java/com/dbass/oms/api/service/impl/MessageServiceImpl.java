@@ -3,16 +3,19 @@ package com.dbass.oms.api.service.impl;
 import com.dbass.oms.api.config.CacheConfig;
 import com.dbass.oms.api.dto.MessageResponseDto;
 import com.dbass.oms.api.dto.MessageSearchRequestDto;
+import com.dbass.oms.api.dto.PagedResponseDto;
 import com.dbass.oms.api.entity.MessageLog;
 import com.dbass.oms.api.repository.MessageRepository;
 import com.dbass.oms.api.service.MessageService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.cache.annotation.Cacheable;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
 import java.util.Objects;
-import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -21,38 +24,41 @@ public class MessageServiceImpl implements MessageService {
     private final MessageRepository messageRepository;
 
     @Override
-    @Cacheable(value = CacheConfig.MESSAGES_CACHE, key = "#requestDto.startDate + ':' + #requestDto.endDate + ':' + #requestDto.msgType + ':' + #requestDto.status + ':' + #requestDto.recipient")
-    public List<MessageResponseDto> searchMessages(MessageSearchRequestDto requestDto) {
+    @Cacheable(value = CacheConfig.MESSAGES_CACHE,
+               key = "#requestDto.startDate + ':' + #requestDto.endDate + ':' + #requestDto.msgType + ':' + #requestDto.status + ':' + #requestDto.recipient + ':' + #requestDto.page + ':' + #requestDto.size")
+    public PagedResponseDto<MessageResponseDto> searchMessages(MessageSearchRequestDto requestDto) {
         String start = requestDto.getStartDate() + "000000";
-        String end = requestDto.getEndDate() + "235959";
-        List<MessageResponseDto> responses = new java.util.ArrayList<>();
-        for (MessageLog message : messageRepository.findBySubmitTimeBetween(start, end)) {
-            if (matchesOptionalFilters(message, requestDto)) {
-                responses.add(toResponse(message));
-            }
-        }
-        return responses;
-    }
+        String end   = requestDto.getEndDate()   + "235959";
 
-    private boolean matchesOptionalFilters(MessageLog message, MessageSearchRequestDto requestDto) {
-        if (requestDto.getStatus() != null && !requestDto.getStatus().equals(message.getStatus())) {
-            return false;
-        }
-        if (requestDto.getMsgType() != null) {
-            Integer msgType = parseIntOrNull(requestDto.getMsgType());
-            if (msgType != null && !msgType.equals(message.getMsgType())) {
-                return false;
-            }
-        }
-        if (requestDto.getRecipient() != null && !requestDto.getRecipient().isBlank()) {
-            if (message.getRcptData() == null || !message.getRcptData().contains(requestDto.getRecipient())) {
-                return false;
-            }
-        }
-        return true;
+        Integer msgType = parseIntOrNull(requestDto.getMsgType());
+        String recipient = (requestDto.getRecipient() != null && !requestDto.getRecipient().isBlank())
+                ? requestDto.getRecipient() : null;
+
+        PageRequest pageable = PageRequest.of(
+                requestDto.getPage(),
+                requestDto.getSize(),
+                Sort.by(Sort.Direction.DESC, "submitTime")
+        );
+
+        Page<MessageLog> page = messageRepository.findByFilters(
+                start, end, requestDto.getStatus(), msgType, recipient, pageable
+        );
+
+        List<MessageResponseDto> content = page.getContent().stream()
+                .map(this::toResponse)
+                .toList();
+
+        return new PagedResponseDto<>(
+                content,
+                page.getTotalElements(),
+                page.getTotalPages(),
+                page.getNumber(),
+                page.getSize()
+        );
     }
 
     private Integer parseIntOrNull(String value) {
+        if (value == null || value.isBlank()) return null;
         try {
             return Integer.parseInt(value);
         } catch (NumberFormatException e) {
@@ -87,9 +93,7 @@ public class MessageServiceImpl implements MessageService {
     }
 
     private String resolveMsgTypeName(Integer msgType) {
-        if (msgType == null) {
-            return "기타";
-        }
+        if (msgType == null) return "기타";
         return switch (msgType) {
             case 1 -> "SMS";
             case 2 -> "LMS";
@@ -107,9 +111,7 @@ public class MessageServiceImpl implements MessageService {
     }
 
     private String resolveStatusName(Integer status) {
-        if (status == null) {
-            return "기타";
-        }
+        if (status == null) return "기타";
         return switch (status) {
             case 0 -> "전송대기";
             case 1, 3, 5, 7 -> "전송중";
@@ -118,4 +120,4 @@ public class MessageServiceImpl implements MessageService {
             default -> "기타";
         };
     }
-} 
+}

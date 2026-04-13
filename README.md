@@ -279,29 +279,54 @@ cp .env.example .env
 
 ## 테스트
 
-JUnit 5 + Spring Boot Test + MockMvc 기반 통합 테스트
+JUnit 5 + Spring Boot Test + Mockito 기반 테스트 63건 (전 구간 커버)
 
-```
-AuthControllerTest
-├── POST /api/auth/login
-│   ├── 성공 - WEB_USER_01 정상 로그인
-│   ├── 성공 - WEB_USER_02 정상 로그인
-│   ├── 실패 - 잘못된 비밀번호
-│   ├── 실패 - 존재하지 않는 사용자
-│   ├── 실패 - API 타입 계정 웹 로그인 불가
-│   └── 실패 - 요청 바디 누락
-├── POST /api/messages/search
-│   ├── 성공 - 웹 사용자 토큰으로 조회
-│   ├── 실패 - 토큰 없음
-│   └── 실패 - 유효하지 않은 토큰
-└── POST /api/auth/logout
-    ├── 성공 - 유효한 토큰
-    └── 실패 - 토큰 없음
-```
+| 테스트 클래스 | 유형 | 건수 |
+|---|---|---|
+| `MessageRepositoryImplTest` | Repository (QueryDSL 슬라이스) | 15 |
+| `MessageServiceImplTest` | Service (순수 단위) | 17 |
+| `AuthControllerTest` | Controller 통합 (인증 API) | 23 |
+| `MessageControllerTest` | Controller 통합 (메시지 조회 API) | 8 |
+| `MessageCacheTest` | Cache 동작 통합 | 4 |
+
+자세한 테스트 항목, 설계 의도, 실행 가이드는 **[TEST.md](TEST.md)** 참조
 
 ---
 
 ## 업데이트 내역
+
+### 2026-04-13
+
+**테스트 전면 구축 (63건, 0 failures)**
+- `MessageRepositoryImplTest`: QueryDSL 동적 쿼리 슬라이스 테스트 15건 (날짜 범위, 단일/복합 조건 필터, 페이징, 정렬)
+- `MessageServiceImplTest`: 서비스 계층 순수 단위 테스트 17건 (날짜 포맷 변환, msgType 파싱, 코드명 매핑)
+- `AuthControllerTest`: 인증 API 통합 테스트 23건 (등록/토큰발급/웹로그인/로그아웃 성공·실패 케이스)
+- `MessageControllerTest`: 메시지 조회 API 통합 테스트 8건 (인증 성공·실패, 입력값 검증)
+- `MessageCacheTest`: Redis 캐시 동작 통합 테스트 4건 (캐시 히트, 조건별 별도 키)
+- `TestConfig`, `application-test.yml` 신규 추가 — Redis Mock, H2 슬라이스 환경 구성
+- `schema-h2.sql` `CREATE TABLE IF NOT EXISTS` 처리, `data-h2.sql` 멱등성(TRUNCATE→INSERT) 적용
+
+**DB 접속 정보 환경변수화**
+- `application.yml` DB `username`, `password` 하드코딩 → `${DB_USERNAME}`, `${DB_PASSWORD}` 환경변수 처리
+- CORS allowed-origins `${CORS_ALLOWED_ORIGINS}` 환경변수 처리
+
+**schema-postgresql.sql 인덱스 추가**
+- `TEST_SUBMIT_LOG`: `submit_time`, `status`, `msg_type` 인덱스 추가
+- `OMS_USER`: `user_id`, `user_url`, `user_type` 복합 인덱스 추가
+
+**페이징 기능 개선**
+- 전체 조회 후, 페이지에서 구분 -> 지정 단위 별로 페이지 조회 기능으로 변경
+  : 서버 전체 조회 대비 부하 감소
+
+**QueryDSL 설정 개선**
+- Q클래스 생성 경로 `build/generated/querydsl` → `src/main/generated` 변경 (IDE 인식 개선)
+- `MessageRepositoryImpl` `fetchOne()` 반환값 null 처리 추가 (NPE 방지)
+
+**Redis 역직렬화 오류 수정**
+- `PagedResponseDto` `@NoArgsConstructor` 추가 (Jackson 역직렬화 오류 해결)
+
+
+---
 
 ### 2026-04-02
 

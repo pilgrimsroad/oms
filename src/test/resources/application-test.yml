@@ -1,0 +1,81 @@
+spring:
+  main:
+    allow-bean-definition-overriding: true
+  datasource:
+    driver-class-name: org.h2.Driver
+    url: jdbc:h2:mem:oms;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE
+    username: sa
+    password:
+  sql:
+    init:
+      mode: always
+      schema-locations: classpath:sql/ddl/schema-h2.sql
+      data-locations: classpath:sql/ddl/data-h2.sql
+  jpa:
+    hibernate:
+      ddl-auto: none
+    open-in-view: false
+    database-platform: org.hibernate.dialect.H2Dialect
+  data:
+    redis:
+      host: localhost
+      port: 6379
+
+app:
+  jwt:
+    secret: test-secret-key-for-unit-testing-only-32bytes
+    expiration-minutes: 525600
+
+access-control:
+  service-types:
+    "1":
+      name: "API"
+      allowed-paths:
+        - "/api/**"
+    "2":
+      name: "Web"
+      allowed-paths:
+        - "/api/auth/**"
+        - "/api/health"
+        - "/api/messages/**"
+
+cors:
+  allowed-origins: http://localhost
+
+logging:
+  level:
+    # ──────────────────────────────────────────────────────────────
+    # 기본값: 테스트 출력 최소화 (평소 이 상태로 유지)
+    # ──────────────────────────────────────────────────────────────
+    com.dbass.oms.api: WARN
+    org.springframework.security: WARN
+    org.hibernate.SQL: WARN
+    com.p6spy: WARN
+
+    # ──────────────────────────────────────────────────────────────
+    # [디버깅용] 필요한 항목만 주석 해제해서 사용
+    # ──────────────────────────────────────────────────────────────
+
+    # [1] 우리 코드 흐름 추적 (Controller → Service → Repository)
+    #     언제: 로직이 예상대로 동작하는지 확인할 때
+    # com.dbass.oms.api: DEBUG
+
+    # [2] 실행된 SQL 확인
+    #     언제: 쿼리가 올바르게 생성되는지, 조건이 제대로 붙는지 확인할 때
+    # org.hibernate.SQL: DEBUG
+
+    # [3] SQL 바인딩 파라미터 값 확인 (? 자리에 실제 어떤 값이 들어가는지)
+    #     언제: [2]와 함께 사용, 파라미터 값까지 보고 싶을 때
+    # org.hibernate.orm.jdbc.bind: TRACE
+
+    # [4] Spring Security 인증/인가 처리 흐름
+    #     언제: 401/403 원인 추적, 토큰 검증 실패 원인 파악할 때
+    # org.springframework.security: DEBUG
+
+    # [5] HTTP 요청/응답 디스패치 흐름
+    #     언제: 어떤 컨트롤러가 매핑됐는지, 응답 상태코드 흐름 볼 때
+    # org.springframework.web: DEBUG
+
+    # [6] 전체 상세 로그 (위 항목 전부 포함, 출력량 매우 많음)
+    #     언제: 원인을 전혀 모르겠을 때 최후 수단으로 사용
+    # root: DEBUG

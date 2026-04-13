@@ -49,13 +49,7 @@ public class OmsUserServiceImpl implements OmsUserService {
         }
 
         if (!passwordEncoder.matches(userPassword, omsUser.getUserPassword())) {
-            // Demo fallback: allow legacy plaintext seeds, then upgrade to bcrypt.
-            if (userPassword != null && userPassword.equals(omsUser.getUserPassword())) {
-                omsUser.setUserPassword(passwordEncoder.encode(userPassword));
-                omsUserRepository.save(omsUser);
-            } else {
-                throw new RuntimeException("사용자 비밀번호가 올바르지 않습니다.");
-            }
+            throw new RuntimeException("사용자 비밀번호가 올바르지 않습니다.");
         }
 
         return jwtTokenProvider.generateToken(omsUser);
@@ -72,12 +66,7 @@ public class OmsUserServiceImpl implements OmsUserService {
         }
 
         if (!passwordEncoder.matches(userPassword, omsUser.getUserPassword())) {
-            if (userPassword != null && userPassword.equals(omsUser.getUserPassword())) {
-                omsUser.setUserPassword(passwordEncoder.encode(userPassword));
-                omsUserRepository.save(omsUser);
-            } else {
-                throw new RuntimeException("사용자 비밀번호가 올바르지 않습니다.");
-            }
+            throw new RuntimeException("사용자 비밀번호가 올바르지 않습니다.");
         }
 
         return omsUser;

@@ -23,4 +23,10 @@ public class MessageSearchRequestDto {
 
     @Schema(description = "수신자 전화번호 일부 또는 전체", example = "010")
     private String recipient;
+
+    @Schema(description = "페이지 번호 (0부터 시작)", example = "0")
+    private int page = 0;
+
+    @Schema(description = "페이지 크기", example = "100")
+    private int size = 100;
 } 

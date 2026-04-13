@@ -31,3 +31,9 @@ CREATE TABLE IF NOT EXISTS TEST_SUBMIT_LOG (
     error_code VARCHAR(20),
     retry_count INT
 );
+
+-- 인덱스
+CREATE INDEX IF NOT EXISTS idx_msg_submit_time ON TEST_SUBMIT_LOG (submit_time);
+CREATE INDEX IF NOT EXISTS idx_msg_status      ON TEST_SUBMIT_LOG (status);
+CREATE INDEX IF NOT EXISTS idx_msg_type        ON TEST_SUBMIT_LOG (msg_type);
+CREATE INDEX IF NOT EXISTS idx_user_lookup     ON OMS_USER (user_id, user_url, user_type);

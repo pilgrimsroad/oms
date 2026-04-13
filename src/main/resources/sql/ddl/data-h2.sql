@@ -1,3 +1,7 @@
+-- 멱등성 보장: 여러 Spring 컨텍스트가 같은 H2 DB를 공유할 때 중복 삽입 방지
+TRUNCATE TABLE TEST_SUBMIT_LOG;
+DELETE FROM OMS_USER;
+
 INSERT INTO OMS_USER (user_id, user_url, user_type, user_password, use_yn, insert_id, insert_dts)
 VALUES (
   'DEMO_USER',
