@@ -1,6 +1,6 @@
 # Redis 관제 가이드
 
-OMS에서 Redis는 JWT 블랙리스트(로그아웃 토큰 차단)와 메시지 조회 캐싱에 사용됩니다.
+OMS에서 Redis는 JWT 블랙리스트(로그아웃 토큰 차단), Refresh Token 저장, 메시지 조회 캐싱에 사용됩니다.
 Redis Insight를 통해 저장된 키, 캐시 히트, 명령어 흐름을 실시간으로 확인할 수 있습니다.
 
 ---
@@ -44,6 +44,7 @@ Redis Insight를 통해 저장된 키, 캐시 히트, 명령어 흐름을 실시
 | 키 패턴 | 설명 | TTL |
 |---------|------|-----|
 | `blacklist:{JWT 토큰}` | 로그아웃된 토큰 차단용 | 토큰 남은 만료시간 |
+| `refresh:{UUID}` | Refresh Token 저장 (`userId\|userUrl\|userType`) | 7일 |
 | `messages::{검색 조건}` | 메시지 조회 캐시 | 5분 |
 
 #### 확인 방법
@@ -51,6 +52,11 @@ Redis Insight를 통해 저장된 키, 캐시 히트, 명령어 흐름을 실시
 - **로그아웃 블랙리스트 확인**
   - 웹에서 로그아웃 후 Browser에서 `blacklist:*` 필터링
   - 해당 키 클릭 → Value: `1`, TTL 남은 시간 표시
+
+- **Refresh Token 확인**
+  - 로그인 후 Browser에서 `refresh:*` 필터링
+  - 키 클릭 → Value: `userId|userUrl|userType`, TTL 최대 10080분(7일)
+  - `/api/auth/refresh` 호출 시 기존 키 삭제 + 신규 키 생성 (Rotation) 확인
 
 - **메시지 캐시 확인**
   - 메시지 조회 후 Browser에서 `messages::*` 필터링
@@ -61,25 +67,50 @@ Redis Insight를 통해 저장된 키, 캐시 히트, 명령어 흐름을 실시
 
 ### 2. Profiler (실시간 명령어 모니터링)
 
-좌측 메뉴 **Profiler** 탭에서 Redis로 들어오는 모든 명령어를 실시간으로 확인합니다.
+Redis Insight 버전에 따라 Profiler 위치가 다릅니다.
 
-#### 사용 방법
+#### Redis Insight 2.x (최신)
 
-1. **Profiler** 탭 클릭
-2. **Start** 버튼 클릭
-3. 웹에서 로그인 / 조회 / 로그아웃 동작 수행
-4. 명령어 스트림 확인
+좌측 메뉴 탭이 아닌 **Browser 화면 하단 바**에 위치합니다.
+
+1. Browser 탭 진입
+2. 화면 하단의 **Profiler** 버튼 클릭 (펼침 패널로 열림)
+3. **Start** 버튼 클릭
+4. 웹에서 로그인 / 조회 / 로그아웃 동작 수행
+5. 명령어 스트림 확인
+
+> 하단 바에 Profiler가 안 보이면 아래 **CLI 방법**을 사용하세요.
+
+#### Redis Insight 1.x (구버전)
+
+좌측 메뉴 **Profiler** 탭 클릭 → **Start** 버튼 클릭
+
+#### CLI로 직접 확인 (버전 무관)
+
+Redis Insight 우측 하단의 **CLI** 버튼 또는 터미널에서 직접 실행:
+
+```bash
+# Docker 컨테이너 내 redis-cli 접속
+docker exec -it oms-redis redis-cli
+
+# MONITOR 명령어 실행 (모든 명령어 실시간 출력)
+MONITOR
+```
+
+> `MONITOR`는 Profiler와 동일한 동작입니다. 확인 후 `Ctrl+C`로 종료하세요.
 
 #### 주요 확인 포인트
 
 | 동작 | 예상 명령어 |
 |------|------------|
+| 로그인 | `SET refresh:{uuid} userId\|userUrl\|userType EX {초}` |
 | 메시지 조회 (최초) | `GET messages::...` → miss → `SET messages::...` |
 | 메시지 조회 (재조회) | `GET messages::...` → hit (SET 없음) |
-| 로그아웃 | `SET blacklist:{token} 1 EX {초}` |
+| 토큰 갱신 (/refresh) | `GET refresh:{old-uuid}` → `DEL refresh:{old-uuid}` → `SET refresh:{new-uuid} ...` |
+| 로그아웃 | `DEL refresh:{uuid}` + `SET blacklist:{token} 1 EX {초}` |
 | 로그아웃 후 API 재요청 | `EXISTS blacklist:{token}` |
 
-> Profiler는 실행 중 Redis 성능에 영향을 줄 수 있으므로 확인 후 **Stop** 하세요.
+> Profiler/MONITOR는 실행 중 Redis 성능에 영향을 줄 수 있으므로 확인 후 반드시 **Stop** 하세요.
 
 ---
 
@@ -125,10 +156,22 @@ FLUSHALL
 
 ---
 
-## 캐시 동작 흐름
+## 캐시 및 토큰 동작 흐름
 
 ```
-[첫 번째 조회]
+[로그인]
+브라우저 → POST /api/auth/login
+           → Redis SET refresh:{uuid} userId|userUrl|userType EX 604800
+           → accessToken(30분) + refreshToken(uuid) 반환
+
+[Access Token 만료 후 갱신]
+브라우저 → POST /api/auth/refresh { refreshToken }
+           → Redis GET refresh:{uuid} → 데이터 확인
+           → Redis DEL refresh:{old-uuid}
+           → Redis SET refresh:{new-uuid} ... (Rotation)
+           → 신규 accessToken + 신규 refreshToken 반환
+
+[첫 번째 메시지 조회]
 브라우저 → POST /api/messages/search
            → Redis GET messages::... → miss
            → PostgreSQL 쿼리 실행
@@ -139,6 +182,11 @@ FLUSHALL
 브라우저 → POST /api/messages/search
            → Redis GET messages::... → hit
            → 응답 반환 (DB 쿼리 없음)
+
+[로그아웃]
+브라우저 → POST /api/auth/logout { refreshToken }
+           → Redis DEL refresh:{uuid}
+           → Redis SET blacklist:{accessToken} 1 EX {남은초}
 
 [로그아웃 후 토큰 재사용 시도]
 클라이언트 → API 요청 (Authorization: Bearer {token})

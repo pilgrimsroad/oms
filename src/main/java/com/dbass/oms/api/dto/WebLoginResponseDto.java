@@ -7,6 +7,7 @@ import lombok.Data;
 @Builder
 public class WebLoginResponseDto {
     private String accessToken;
+    private String refreshToken;
     private String tokenType;
     private long expiresInMinutes;
     private String userId;

@@ -28,16 +28,26 @@ app:
 
 access-control:
   service-types:
+    "99":
+      name: "Admin"
+      allowed-paths:
+        - "/api/**"
     "1":
       name: "API"
       allowed-paths:
         - "/api/**"
     "2":
-      name: "Web"
+      name: "Sender"
       allowed-paths:
         - "/api/auth/**"
-        - "/api/health"
+        - "/actuator/**"
         - "/api/messages/**"
+    "3":
+      name: "Viewer"
+      allowed-paths:
+        - "/api/auth/**"
+        - "/actuator/health"
+        - "/api/messages/search"
 
 cors:
   allowed-origins: http://localhost

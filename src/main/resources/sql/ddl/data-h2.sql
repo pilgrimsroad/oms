@@ -3,6 +3,9 @@ TRUNCATE TABLE TEST_SUBMIT_LOG;
 DELETE FROM OMS_USER;
 
 INSERT INTO OMS_USER (user_id, user_url, user_type, user_password, use_yn, insert_id, insert_dts)
+VALUES ('ADMIN', 'https://admin.oms.local', '99', 'adminpass', 'Y', 'portfolio', CURRENT_TIMESTAMP());
+
+INSERT INTO OMS_USER (user_id, user_url, user_type, user_password, use_yn, insert_id, insert_dts)
 VALUES (
   'DEMO_USER',
   'https://example.com',

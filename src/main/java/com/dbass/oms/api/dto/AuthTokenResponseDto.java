@@ -21,6 +21,9 @@ public class AuthTokenResponseDto {
     @Schema(description = "토큰 타입", example = "Bearer")
     private String tokenType;
 
-    @Schema(description = "만료 시간(분)", example = "60")
+    @Schema(description = "만료 시간(분)", example = "30")
     private long expiresInMinutes;
+
+    @Schema(description = "리프레시 토큰", example = "550e8400-e29b-41d4-a716-446655440000")
+    private String refreshToken;
 }

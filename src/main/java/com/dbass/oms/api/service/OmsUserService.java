@@ -27,6 +27,8 @@ public interface OmsUserService {
      */
     String issueToken(String userId, String userUrl, String userPassword);
 
+    OmsUser issueTokenUser(String userId, String userUrl, String userPassword);
+
     /**
      * 사용자를 비활성화합니다.
      *

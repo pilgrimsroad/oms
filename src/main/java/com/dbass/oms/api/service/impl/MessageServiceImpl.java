@@ -3,6 +3,8 @@ package com.dbass.oms.api.service.impl;
 import com.dbass.oms.api.config.CacheConfig;
 import com.dbass.oms.api.dto.MessageResponseDto;
 import com.dbass.oms.api.dto.MessageSearchRequestDto;
+import com.dbass.oms.api.dto.MessageSendRequestDto;
+import com.dbass.oms.api.dto.MessageSendResponseDto;
 import com.dbass.oms.api.dto.PagedResponseDto;
 import com.dbass.oms.api.entity.MessageLog;
 import com.dbass.oms.api.repository.MessageRepository;
@@ -13,13 +15,18 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.Objects;
 
 @Service
 @RequiredArgsConstructor
 public class MessageServiceImpl implements MessageService {
+
+    private static final DateTimeFormatter DT_FMT = DateTimeFormatter.ofPattern("yyyyMMddHHmmss");
 
     private final MessageRepository messageRepository;
 
@@ -55,6 +62,59 @@ public class MessageServiceImpl implements MessageService {
                 page.getNumber(),
                 page.getSize()
         );
+    }
+
+    @Override
+    @Transactional
+    public MessageSendResponseDto send(MessageSendRequestDto requestDto, String requestedBy) {
+        String now = LocalDateTime.now().format(DT_FMT);
+
+        MessageLog log = new MessageLog();
+        log.setMsgType(requestDto.getMsgType());
+        log.setCallbackNum(requestDto.getCallbackNum());
+        log.setRcptData(requestDto.getRcptData());
+        log.setSubject(requestDto.getSubject());
+        log.setMessage(requestDto.getMessage());
+        log.setScheduleTime(requestDto.getScheduleTime());
+        log.setSubmitTime(now);
+        log.setRequestedAt(now);
+        log.setStatus(0);
+        log.setRetryCount(0);
+
+        MessageLog saved = messageRepository.save(log);
+
+        return MessageSendResponseDto.builder()
+                .msgId(saved.getMsgId())
+                .msgType(saved.getMsgType())
+                .rcptData(saved.getRcptData())
+                .status(saved.getStatus())
+                .requestedAt(saved.getRequestedAt())
+                .message("발송 요청이 접수되었습니다.")
+                .build();
+    }
+
+    @Override
+    @Transactional
+    public int processAgentJob() {
+        List<MessageLog> pendingList = messageRepository.findAllByStatus(0);
+        if (pendingList.isEmpty()) return 0;
+
+        String now = LocalDateTime.now().format(DT_FMT);
+
+        for (MessageLog log : pendingList) {
+            log.setStatus(2);
+            log.setSentAt(now);
+            log.setResult("success");
+            log.setResultDesc("정상발송");
+        }
+
+        messageRepository.saveAll(pendingList);
+        return pendingList.size();
+    }
+
+    @Override
+    public int getPendingCount() {
+        return messageRepository.countByStatus(0);
     }
 
     private Integer parseIntOrNull(String value) {

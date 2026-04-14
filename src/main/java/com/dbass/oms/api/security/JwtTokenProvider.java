@@ -16,6 +16,7 @@ import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.Date;
+import java.util.UUID;
 
 @Component
 @RequiredArgsConstructor
@@ -27,6 +28,10 @@ public class JwtTokenProvider {
     @Getter
     @Value("${app.jwt.expiration-minutes}")
     private long expirationMinutes;
+
+    @Getter
+    @Value("${app.jwt.refresh-expiration-minutes}")
+    private long refreshExpirationMinutes;
 
     private SecretKey signingKey;
 
@@ -59,6 +64,10 @@ public class JwtTokenProvider {
                 .build()
                 .parseSignedClaims(token)
                 .getPayload();
+    }
+
+    public String generateRefreshToken() {
+        return UUID.randomUUID().toString();
     }
 
     public boolean validateToken(String token) {

@@ -35,7 +35,9 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             "/api/auth/register",
             "/api/auth/token",
             "/api/auth/login",
-            "/api/health",
+            "/api/auth/refresh",
+            "/actuator",
+            "/admin",
             "/v3/api-docs",
             "/swagger-ui",
             "/swagger-ui.html",
@@ -88,16 +90,19 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
     }
 
     private boolean isAccessAllowed(String serviceType, String requestURI) {
-        if ("1".equals(serviceType)) {
+        // 관리자, API 유저 — 전체 접근
+        if ("99".equals(serviceType) || "1".equals(serviceType)) {
             return true;
         }
+        // 발송 가능 유저 — 조회 + 발송
         if ("2".equals(serviceType)) {
-            List<String> allowedPathsForWeb = Arrays.asList(
-                    "/api/auth",
-                    "/api/health",
-                    "/api/messages"
-            );
-            return allowedPathsForWeb.stream().anyMatch(requestURI::startsWith);
+            List<String> allowed = Arrays.asList("/api/auth", "/actuator", "/api/messages");
+            return allowed.stream().anyMatch(requestURI::startsWith);
+        }
+        // 일반 유저 — 조회만
+        if ("3".equals(serviceType)) {
+            List<String> allowed = Arrays.asList("/api/auth", "/actuator/health", "/api/messages/search");
+            return allowed.stream().anyMatch(requestURI::startsWith);
         }
         return false;
     }

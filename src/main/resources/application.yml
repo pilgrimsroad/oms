@@ -1,7 +1,16 @@
 server:
-  port: 8080
+  port: ${OMS_PORT:8080}
   servlet:
     context-path: /
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health, info, metrics, loggers, caches, threaddump, env
+  endpoint:
+    health:
+      show-details: always
 
 springdoc:
   swagger-ui:
@@ -13,6 +22,14 @@ springdoc:
 spring:
   application:
     name: oms-api
+  boot:
+    admin:
+      context-path: /admin
+      client:
+        url: ${OMS_BASE_URL:http://localhost:8080}/admin
+        instance:
+          name: ${spring.application.name}
+          service-url: ${OMS_BASE_URL:http://localhost:8080}
 
   # ========================
   # [활성] PostgreSQL 설정
@@ -72,19 +89,31 @@ logging:
 app:
   jwt:
     secret: ${OMS_JWT_SECRET:local-dev-secret-change-me-32-bytes-min}
-    expiration-minutes: ${OMS_JWT_EXPIRES_MINUTES:525600}
+    expiration-minutes: ${OMS_JWT_EXPIRES_MINUTES:30}
+    refresh-expiration-minutes: ${OMS_JWT_REFRESH_EXPIRES_MINUTES:10080}
 
 access-control:
   service-types:
+    "99":
+      name: "Admin"
+      allowed-paths:
+        - "/api/**"
     "1":
       name: "API"
       allowed-paths:
         - "/api/**"
     "2":
-      name: "Web"
+      name: "Sender"
       allowed-paths:
         - "/api/auth/**"
-        - "/api/health"
+        - "/actuator/**"
+        - "/api/messages/**"
+    "3":
+      name: "Viewer"
+      allowed-paths:
+        - "/api/auth/**"
+        - "/actuator/health"
+        - "/api/messages/search"
 
 cors:
   allowed-origins: ${CORS_ALLOWED_ORIGINS:http://localhost}

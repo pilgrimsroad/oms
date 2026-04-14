@@ -30,8 +30,9 @@ public class SecurityConfig {
                 // CORS preflight OPTIONS 요청은 인증 없이 허용
                 .requestMatchers(org.springframework.http.HttpMethod.OPTIONS, "/**").permitAll()
                 // External API (RestAPI 전용)
-                .requestMatchers("/api/auth/register", "/api/auth/token", "/api/auth/login").permitAll()
-                .requestMatchers("/api/health").permitAll()
+                .requestMatchers("/api/auth/register", "/api/auth/token", "/api/auth/login", "/api/auth/refresh").permitAll()
+                .requestMatchers("/actuator/**").permitAll()
+                .requestMatchers("/admin/**").permitAll()
                 .requestMatchers("/api/messages/**").authenticated()
                 .requestMatchers("/h2-console/**").permitAll()
                 // Swagger

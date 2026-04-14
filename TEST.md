@@ -13,7 +13,9 @@ OMS API 테스트 전체 현황 및 실행 방법 정리
 | `AuthControllerTest` | Controller 통합 (인증 API) | 23 | `controller/` |
 | `MessageControllerTest` | Controller 통합 (메시지 조회 API) | 8 | `controller/` |
 | `MessageCacheTest` | Cache 동작 통합 | 4 | `service/` |
-| **합계** | | **63** | |
+| `MessageSendControllerTest` | Controller 통합 (발송 요청/에이전트) | 10 | `controller/` |
+| `RefreshTokenControllerTest` | Controller 통합 (Refresh Token) | 9 | `controller/` |
+| **합계** | | **82** | |
 
 모든 테스트는 외부 인프라(PostgreSQL, Redis) 없이 실행됩니다.
 
@@ -35,6 +37,8 @@ OMS API 테스트 전체 현황 및 실행 방법 정리
 ./gradlew test --tests "com.dbass.oms.api.controller.AuthControllerTest"
 ./gradlew test --tests "com.dbass.oms.api.controller.MessageControllerTest"
 ./gradlew test --tests "com.dbass.oms.api.service.MessageCacheTest"
+./gradlew test --tests "com.dbass.oms.api.controller.MessageSendControllerTest"
+./gradlew test --tests "com.dbass.oms.api.controller.RefreshTokenControllerTest"
 ```
 
 ### 특정 메서드 단위 실행
@@ -232,3 +236,61 @@ A. Spring은 `@MockBean` 조합이 다르면 별도 컨텍스트를 생성합니
 
 **Q. 테스트에서 비밀번호가 BCrypt 해시 없이 평문으로 동작하는 이유는요?**  
 A. H2 초기 데이터(`data-h2.sql`)에 plain-text 비밀번호가 저장되어 있습니다. 통합 테스트에서 `@MockBean PasswordEncoder`를 선언하고 `matches(raw, encoded)`가 두 값을 직접 비교하도록 stub하므로, 실제 BCrypt 해싱 없이 로그인 흐름을 검증할 수 있습니다.
+
+---
+
+### 6. MessageSendControllerTest
+
+**유형**: `@SpringBootTest` + `@AutoConfigureMockMvc` + `@ActiveProfiles("test")`  
+**Mock**: `PasswordEncoder`, `TokenBlacklistService`, `CacheManager`
+
+#### POST /api/messages/send
+
+| 케이스 | 기대 응답 |
+|---|---|
+| SMS 발송 요청 성공 (type=2) | 200, msgId/rcptData/status=0/requestedAt/message 반환 |
+| scheduleTime 포함 발송 요청 성공 | 200 |
+| 토큰 없이 요청 | 401 |
+| msgType 누락 | 400 |
+| callbackNum 누락 | 400 |
+| message 누락 | 400 |
+
+#### POST /api/agent/process
+
+| 케이스 | 기대 응답 |
+|---|---|
+| 대기 건 있을 때 처리 성공 (type=99) | 200, processedCount > 0 / message 반환 |
+| 대기 건 없을 때 처리 성공 | 200, processedCount = 0 |
+| 토큰 없이 요청 | 401 |
+| type=2 계정으로 요청 | 403 |
+
+---
+
+### 7. RefreshTokenControllerTest
+
+**유형**: `@SpringBootTest` + `@AutoConfigureMockMvc` + `@ActiveProfiles("test")`  
+**Mock**: `PasswordEncoder`, `TokenBlacklistService`, `CacheManager`
+
+#### 로그인/토큰발급 응답 검증
+
+| 케이스 | 기대 응답 |
+|---|---|
+| 웹 로그인 응답에 refreshToken 포함 | 200, refreshToken 필드 non-null |
+| API 토큰발급 응답에 refreshToken 포함 | 200, refreshToken 필드 non-null |
+
+#### POST /api/auth/refresh
+
+| 케이스 | 기대 응답 |
+|---|---|
+| 유효한 refreshToken으로 갱신 성공 | 200, 신규 accessToken + 신규 refreshToken 반환 |
+| Rotation 검증 | `deleteRefreshToken` 호출 + `saveRefreshToken` 호출 확인 |
+| 유효하지 않은 refreshToken | 401 |
+| refreshToken 필드 누락 | 400 |
+| refreshToken 빈 문자열 | 400 |
+
+#### POST /api/auth/logout (refreshToken 포함)
+
+| 케이스 | 기대 응답 |
+|---|---|
+| refreshToken 포함 로그아웃 | 200, `deleteRefreshToken` 호출 확인 |
+| refreshToken 미포함 로그아웃 | 200 (optional 처리) |

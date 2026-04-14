@@ -82,18 +82,28 @@ public class ApiKeyController {
             @Valid @RequestBody AuthTokenRequestDto authTokenRequestDto,
             HttpServletRequest httpRequest) {
         try {
-            String token = omsUserService.issueToken(
+            OmsUser omsUser = omsUserService.issueTokenUser(
                     authTokenRequestDto.getUserId(),
                     authTokenRequestDto.getUserUrl(),
                     authTokenRequestDto.getUserPassword()
             );
+            String accessToken = jwtTokenProvider.generateToken(omsUser);
+            String refreshToken = jwtTokenProvider.generateRefreshToken();
+            tokenBlacklistService.saveRefreshToken(
+                    refreshToken,
+                    omsUser.getUserId(),
+                    omsUser.getUserUrl(),
+                    omsUser.getUserType(),
+                    java.time.Duration.ofMinutes(jwtTokenProvider.getRefreshExpirationMinutes())
+            );
 
             AuthTokenResponseDto response = AuthTokenResponseDto.builder()
-                    .accessToken(token)
+                    .accessToken(accessToken)
+                    .refreshToken(refreshToken)
                     .tokenType("Bearer")
                     .expiresInMinutes(jwtTokenProvider.getExpirationMinutes())
                     .build();
-            
+
             return ResponseEntity.ok(response);
         } catch (RuntimeException e) {
             ApiErrorResponseDto error = ApiErrorResponseDto.builder()
@@ -118,10 +128,19 @@ public class ApiKeyController {
             HttpServletRequest httpRequest) {
         try {
             OmsUser omsUser = omsUserService.loginWeb(request.getUserId(), request.getUserPassword());
-            String token = jwtTokenProvider.generateToken(omsUser);
+            String accessToken = jwtTokenProvider.generateToken(omsUser);
+            String refreshToken = jwtTokenProvider.generateRefreshToken();
+            tokenBlacklistService.saveRefreshToken(
+                    refreshToken,
+                    omsUser.getUserId(),
+                    omsUser.getUserUrl(),
+                    omsUser.getUserType(),
+                    java.time.Duration.ofMinutes(jwtTokenProvider.getRefreshExpirationMinutes())
+            );
 
             WebLoginResponseDto response = WebLoginResponseDto.builder()
-                    .accessToken(token)
+                    .accessToken(accessToken)
+                    .refreshToken(refreshToken)
                     .tokenType("Bearer")
                     .expiresInMinutes(jwtTokenProvider.getExpirationMinutes())
                     .userId(omsUser.getUserId())
@@ -141,7 +160,7 @@ public class ApiKeyController {
     @PostMapping("/logout")
     @Operation(
         summary = "로그아웃",
-        description = "JWT는 stateless이므로 서버에서 토큰을 무효화하지 않습니다. 클라이언트에서 토큰을 삭제하세요.",
+        description = "Access Token을 블랙리스트에 등록하고 Refresh Token을 삭제합니다.",
         security = @SecurityRequirement(name = "bearerAuth"),
         responses = {
             @ApiResponse(responseCode = "200", description = "로그아웃 성공"),
@@ -150,6 +169,7 @@ public class ApiKeyController {
     )
     public ResponseEntity<?> logout(
             @AuthenticationPrincipal UserPrincipal principal,
+            @RequestBody(required = false) RefreshTokenRequestDto logoutRequest,
             HttpServletRequest httpRequest) {
         String authHeader = httpRequest.getHeader("Authorization");
         if (authHeader != null && authHeader.startsWith("Bearer ")) {
@@ -161,9 +181,61 @@ public class ApiKeyController {
                 tokenBlacklistService.blacklist(token, Duration.ofSeconds(remainingSeconds));
             }
         }
+        if (logoutRequest != null && logoutRequest.getRefreshToken() != null) {
+            tokenBlacklistService.deleteRefreshToken(logoutRequest.getRefreshToken());
+        }
         return ResponseEntity.ok().body(java.util.Map.of(
                 "message", "로그아웃 되었습니다.",
                 "userId", principal.getUserId()
         ));
+    }
+
+    @PostMapping("/refresh")
+    @Operation(
+        summary = "Access Token 재발급",
+        description = "Refresh Token으로 새 Access Token과 Refresh Token을 발급합니다.",
+        responses = {
+            @ApiResponse(responseCode = "200", description = "재발급 성공"),
+            @ApiResponse(responseCode = "401", description = "유효하지 않은 Refresh Token")
+        }
+    )
+    public ResponseEntity<?> refresh(
+            @Valid @RequestBody RefreshTokenRequestDto request,
+            HttpServletRequest httpRequest) {
+        String[] tokenData = tokenBlacklistService.getRefreshTokenData(request.getRefreshToken());
+        if (tokenData == null) {
+            ApiErrorResponseDto error = ApiErrorResponseDto.builder()
+                    .error("유효하지 않거나 만료된 Refresh Token입니다.")
+                    .path(httpRequest.getRequestURI())
+                    .build();
+            return ResponseEntity.status(401).body(error);
+        }
+
+        // Rotation: 기존 Refresh Token 즉시 폐기
+        tokenBlacklistService.deleteRefreshToken(request.getRefreshToken());
+
+        OmsUser omsUser = new OmsUser();
+        omsUser.setUserId(tokenData[0]);
+        omsUser.setUserUrl(tokenData[1]);
+        omsUser.setUserType(tokenData[2]);
+
+        String newAccessToken = jwtTokenProvider.generateToken(omsUser);
+        String newRefreshToken = jwtTokenProvider.generateRefreshToken();
+        tokenBlacklistService.saveRefreshToken(
+                newRefreshToken,
+                omsUser.getUserId(),
+                omsUser.getUserUrl(),
+                omsUser.getUserType(),
+                java.time.Duration.ofMinutes(jwtTokenProvider.getRefreshExpirationMinutes())
+        );
+
+        AuthTokenResponseDto response = AuthTokenResponseDto.builder()
+                .accessToken(newAccessToken)
+                .refreshToken(newRefreshToken)
+                .tokenType("Bearer")
+                .expiresInMinutes(jwtTokenProvider.getExpirationMinutes())
+                .build();
+
+        return ResponseEntity.ok(response);
     }
 } 
